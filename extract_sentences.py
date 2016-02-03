@@ -9,9 +9,9 @@ This module extracts the sentences from the snli corpus:
  http://nlp.stanford.edu/projects/snli/
 """
 import sys
-from bs4 import BeautifulSoup as bs
 import pandas as pd
 import numpy as np
+from keras.preprocessing.text import text_to_word_sequence, base_filter
 
 def read_json_file():
 
@@ -51,11 +51,19 @@ def read_json_file():
         del data_df['sentence2_parse']
         print data_df.head(3)
         print data_df.tail(3)
+
         return data_df
     except IOError as e:
         print e
 
-
+def make_unicode(source_text):
+    not_letters_or_digits = u'!"#%\'()*+,-./:;<=>?@[\]^_`{|}~'
+    no_unicode = ''
+    for char in source_text:
+        if char in not_letters_or_digits:
+            char = " "
+        no_unicode+=char
+    return no_unicode
 
 def embed_words(sentences_df):
     '''
@@ -65,11 +73,9 @@ def embed_words(sentences_df):
     vocabulary = []
     list_of_sentences1 = sentences_df['sentence1'].tolist()
     list_of_sentences2 = sentences_df['sentence2'].tolist()
-    # print list_of_sentences1[:3]
-    # print list_of_sentences2[:3]
-    # idx2label = dict((k,v) for v,k in dic['labels2idx'].iteritems())
-    # idx2word  = dict((k,v) for v,k in dic['words2idx'].iteritems())
-
+    list_sentence_words = []
+    '''
+    # Do same with keras
     for sentence in list_of_sentences1:
         sentence.lower()
         #tokenize or split by " "
@@ -77,6 +83,14 @@ def embed_words(sentences_df):
         for token1 in tokens1:
             if token1 not in vocabulary:
                 vocabulary.append(token1)
+    '''
+    for sentence in list_of_sentences1:
+
+        sentence_no_unicode = make_unicode(sentence)
+        print sentence_no_unicode
+        list_sentence_word_tmp = text_to_word_sequence(sentence_no_unicode.encode('ascii'), filters=base_filter(), lower=True, split=" ")
+        print list_sentence_word_tmp
+
     print "length of vocabulary: %d"%len(vocabulary)
 
 
