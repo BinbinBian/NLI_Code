@@ -5,7 +5,6 @@ This module extracts the sentences from the snli corpus:
  Samuel R. Bowman, Gabor Angeli, Christopher Potts, and Christopher D. Manning. 2015.
  A large annotated corpus for learning natural language inference.
  In Proceedings of the 2015 Conference on Empirical Methods in Natural Language Processing (EMNLP)
-
  http://nlp.stanford.edu/projects/snli/
 """
 import sys
@@ -84,15 +83,15 @@ def embed_words(sentences_df):
             if token1 not in vocabulary:
                 vocabulary.append(token1)
     '''
+    list_sentence_word_tmp = []
     for sentence in list_of_sentences1:
-
         sentence_no_unicode = make_unicode(sentence)
         print sentence_no_unicode
-        list_sentence_word_tmp = text_to_word_sequence(sentence_no_unicode.encode('ascii'), filters=base_filter(), lower=True, split=" ")
-        print list_sentence_word_tmp
+        list_sentence_word_tmp += text_to_word_sequence(sentence_no_unicode.encode('ascii'), filters=base_filter(), lower=True, split=" ")
 
-    print "length of vocabulary: %d"%len(vocabulary)
-
+    set_words = set(list_sentence_word_tmp)
+    print "length of vocabulary: %d"%len(set_words)
+    return set_words, len(set_words)
 
 
 
@@ -100,4 +99,4 @@ def embed_words(sentences_df):
 
 
 df_data = read_json_file()
-vocab = embed_words(df_data)
+vocab, len_vocab = embed_words(df_data)
