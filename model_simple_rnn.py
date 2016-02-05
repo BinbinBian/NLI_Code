@@ -68,7 +68,7 @@ class paper_model():
 
         print('Compiling model...')
         sgd = SGD(lr=0.1, decay=1e-6, momentum=0.9, nesterov=True)
-        nli_model.compile(loss='rmse', optimizer=sgd)
+        nli_model.compile(loss='rmse', optimizer=sgd, class_mode='categorical')
         print('Model Compiled')
 
     # model.fit()

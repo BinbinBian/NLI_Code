@@ -64,6 +64,14 @@ def make_unicode(source_text):
         no_unicode+=char
     return no_unicode
 
+def label_output_data(label):
+    labels = {'neutral':np.array([0,1,0]),
+                'entailment':np.array([1,0,0]),
+                'contradiction':np.array([0,0,1]),
+                ' ': np.array([0,0,0])
+                }
+    return labels[label]
+
 def create_sentence_ds(sentences_df):
     # create pair [[s1,s2], label]
     data_set = []
@@ -71,11 +79,14 @@ def create_sentence_ds(sentences_df):
     list_premises = sentences_df['sentence1'].tolist()
     list_hypothesis = sentences_df['sentence2'].tolist()
     list_label = sentences_df['gold_label'].tolist()
-    for premise, hypothesis, label in zip(list_premises, list_hypothesis, list_label):
-            data_set.append([[premise, hypothesis],label])
+    for premise, hypothesis, label_text in zip(list_premises, list_hypothesis, list_label):
+            label_no_unicode = make_unicode(label_text)
+            numpy_label = label_output_data(label_no_unicode)
+            print numpy_label
+            data_set.append([[premise, hypothesis],numpy_label])
     return data_set
 
-def embed_words(sentences_df):
+def give_vocabulary(sentences_df):
     '''
     @parameter: the dataframe from the json file with the 5 columns we need
     @returns: the vocabulary in a set.
@@ -109,4 +120,8 @@ def embed_words(sentences_df):
 # simple test of extracting a json file and showing the len of the vocabulary
 def test():
     df_data = read_json_file()
-    vocab, len_vocab = embed_words(df_data)
+    vocab, len_vocab = give_vocabulary(df_data)
+def test_labeling():
+    labels = ['neutral','entailment','contradiction']
+    for label in labels:
+        print label_output_data(label)
