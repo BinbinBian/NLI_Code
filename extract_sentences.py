@@ -64,6 +64,17 @@ def make_unicode(source_text):
         no_unicode+=char
     return no_unicode
 
+def create_sentence_ds(sentences_df):
+    # create pair [[s1,s2], label]
+    data_set = []
+    print('Generating dataset')
+    list_premises = sentences_df['sentence1'].tolist()
+    list_hypothesis = sentences_df['sentence2'].tolist()
+    list_label = sentences_df['gold_label'].tolist()
+    for premise, hypothesis, label in zip(list_premises, list_hypothesis, list_label):
+            data_set.append([[premise, hypothesis],label])
+    return data_set
+
 def embed_words(sentences_df):
     '''
     @parameter: the dataframe from the json file with the 5 columns we need
@@ -84,19 +95,18 @@ def embed_words(sentences_df):
                 vocabulary.append(token1)
     '''
     list_sentence_word_tmp = []
-    for sentence in list_of_sentences1:
-        sentence_no_unicode = make_unicode(sentence)
-        print sentence_no_unicode
-        list_sentence_word_tmp += text_to_word_sequence(sentence_no_unicode.encode('ascii'), filters=base_filter(), lower=True, split=" ")
+    for s1, s2 in zip (list_of_sentences1, list_of_sentences2):
+        sentence_no_unicode1 = make_unicode(s1)
+        sentence_no_unicode2 = make_unicode(s2)
+        #print sentence_no_unicode
+        list_sentence_word_tmp += text_to_word_sequence(sentence_no_unicode1.encode('ascii'), filters=base_filter(), lower=True, split=" ")
+        list_sentence_word_tmp += text_to_word_sequence(sentence_no_unicode2.encode('ascii'), filters=base_filter(), lower=True, split=" ")
 
     set_words = set(list_sentence_word_tmp)
     print "length of vocabulary: %d"%len(set_words)
-    return set_words, len(set_words)
+    return set_words, len(set_words),
 
-
-
-
-
-
-df_data = read_json_file()
-vocab, len_vocab = embed_words(df_data)
+# simple test of extracting a json file and showing the len of the vocabulary
+def test():
+    df_data = read_json_file()
+    vocab, len_vocab = embed_words(df_data)
