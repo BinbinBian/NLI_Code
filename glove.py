@@ -5,6 +5,7 @@ import string
 import re
 import argparse
 from collections import Counter, defaultdict
+import numpy as np
 
 __author__ = 'david_torrejon'
 
@@ -39,7 +40,7 @@ Context -> sentence
 
 
 parser = argparse.ArgumentParser(description='Get File to process with GloVe')
-parser.add_argument('-fn', metavar='file_name', type=str, nargs=1, help='name of the file')
+parser.add_argument('-f', metavar='file_name', type=str, nargs=1, help='name of the file')
 
 #some parameters
 default_folder = 'snli_1.0/'
@@ -53,6 +54,8 @@ def test_init():
 
 def token_count(corpus, ndim):
     tokens_dict = defaultdict(int) #empty dict faster access than checking if its in a list
+    word2idx = {}
+    idx = 1
     for sentence in corpus:
         regex = re.compile('[%s]' % re.escape(string.punctuation))
         sentence = regex.sub('', sentence).lower()
@@ -62,18 +65,62 @@ def token_count(corpus, ndim):
             #print (token)
             if token not in non_useful_tokens:
                 tokens_dict[token]+=1
+            if token not in word2idx:
+                word2idx[token] = idx
+                #print (token, idx)
+                idx +=1
 
     #tokens_list = sorted(tokens_dict.items(), key=itemgetter(1), reverse=True)
     c = Counter(tokens_dict)
     common_tokens = c.most_common()
     print (common_tokens[:10])
     #print (sum(c.values()))
+    # return 300 most common tokens
+    # can return all and after matrix pick 300 better?
+    return common_tokens, word2idx, idx
+
+def convert_sentence_index(sentence, word2id):
+    sindex = []
+    regex = re.compile('[%s]' % re.escape(string.punctuation))
+    sentence = regex.sub('', sentence).lower()
+    #print (sentence)
+    tokens_sentence = sentence.split(" ")
+    for token in tokens_sentence:
+        sindex.append(word2id[token])
+    return sindex
+
+def get_coocu_matrix(corpus, word2idx, rows):
+    # not proper for computations...would be better a np matrix but to represent... word -> index?
+    cooc_m = np.zeros((rows+1, rows+1))
+    print ('Matrix of size',cooc_m.size,'created...')
+    print ('Generating coocurrence matrix...')
+    """
+      1  2  3  -> first row and first column have indexes of words
+    1 x  y  z
+    2 x1 y1 z1
+    3 x2 y2 z2
+
+    """
+    for sentence in corpus:
+        #print (sentence)
+        idx_sent = convert_sentence_index(sentence, word2idx)
+        #print (idx_sent)
+        for idx_s in idx_sent:
+            cooc_m[idx_s][0]=idx_s
+            for idx_w in idx_sent:
+                cooc_m[0][idx_w]=idx_w
+                cooc_m[idx_s][idx_w]+=1
+    print (cooc_m[0])
+    print (cooc_m[:,0])
+    print (cooc_m[1])
+
+
 
 
 def glove_init():
     try:
         args = parser.parse_args()
-        file_name = default_folder + args.fn[0]
+        file_name = default_folder + args.f[0]
         print("Reading file", file_name, "...")
         file_path, file_ext = splitext(file_name)
         with open(file_name, 'rb') as f:
@@ -92,8 +139,8 @@ def glove_init():
         '''
         # build dictionary?
         print("Counting word appearances...")
-        token_count(sentences, ndimensions)
-
+        tokens, word2index, nidx = token_count(sentences, ndimensions)
+        coocurrence_matrix = get_coocu_matrix(sentences, word2index, nidx)
 
     except BaseException as e:
         print (e)
