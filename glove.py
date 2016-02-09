@@ -45,6 +45,7 @@ parser.add_argument('-f', metavar='file_name', type=str, nargs=1, help='name of 
 #some parameters
 default_folder = 'snli_1.0/'
 ndimensions = 300
+zero = 0.0
 #not_useful tokens
 non_useful_tokens = ['a', 'the']
 
@@ -52,15 +53,19 @@ non_useful_tokens = ['a', 'the']
 def test_init():
     glove_init()
 
+def tokenize_sentence(sentence):
+    regex = re.compile('[%s]' % re.escape(string.punctuation))
+    sentence = regex.sub('', sentence).lower()
+    #print (sentence)
+    tokenized_sentence = sentence.split(" ")
+    return tokenized_sentence
+
 def token_count(corpus, ndim):
     tokens_dict = defaultdict(int) #empty dict faster access than checking if its in a list
     word2idx = {}
     idx = 1
     for sentence in corpus:
-        regex = re.compile('[%s]' % re.escape(string.punctuation))
-        sentence = regex.sub('', sentence).lower()
-        #print (sentence)
-        tokens_sentence = sentence.split(" ")
+        tokens_sentence = tokenize_sentence(sentence)
         for token in tokens_sentence:
             #print (token)
             if token not in non_useful_tokens:
@@ -81,25 +86,23 @@ def token_count(corpus, ndim):
 
 def convert_sentence_index(sentence, word2id):
     sindex = []
-    regex = re.compile('[%s]' % re.escape(string.punctuation))
-    sentence = regex.sub('', sentence).lower()
-    #print (sentence)
-    tokens_sentence = sentence.split(" ")
+    tokens_sentence = tokenize_sentence(sentence)
     for token in tokens_sentence:
         sindex.append(word2id[token])
     return sindex
 
-def get_coocu_matrix(corpus, word2idx, rows):
+def get_coocu_matrix(corpus, word2idx, nrows):
     # not proper for computations...would be better a np matrix but to represent... word -> index?
-    cooc_m = np.zeros((rows+1, rows+1))
+    cooc_m = np.zeros((nrows+1, nrows+1))
+    #prob_m = np.zeros((nrows+1, nrows+1))
     print ('Matrix of size',cooc_m.size,'created...')
     print ('Generating coocurrence matrix...')
     """
-      1  2  3  -> first row and first column have indexes of words
-    1 x  y  z
-    2 x1 y1 z1
-    3 x2 y2 z2
-
+      1  2  3  SUM-> first row and first column have indexes of words
+    1 x  y  z  x+y+z
+    2 x1 y1 z1 x1+y1+z1
+    3 x2 y2 z2 x2+y2+z2
+    easy to compute the probabilities...
     """
     for sentence in corpus:
         #print (sentence)
@@ -110,12 +113,34 @@ def get_coocu_matrix(corpus, word2idx, rows):
             for idx_w in idx_sent:
                 cooc_m[0][idx_w]=idx_w
                 cooc_m[idx_s][idx_w]+=1
-    print (cooc_m[0])
-    print (cooc_m[:,0])
-    print (cooc_m[1])
 
+    #compute probabilities
+    first_row = True
+    for row in cooc_m:
+        if not first_row:
+            #print (occurences)
+            row[nrows] = (np.sum(row))-row[0]
+        first_row = False
+    print('Counting done...')
+    print('Generating probabilities...')
+    first_row = True
+    #copyto(dst, src)
+    prob_m = np.zeros((nrows+1, nrows+1))
 
+    for i in range(1, nrows+1):
+        if(i%500==0):
+            print('Updated',i,'probabilities...')
+        for j in range(nrows+1):
+            if j > 0:
+                prob_m[i][j] = cooc_m[i][j]/cooc_m[i][nrows]
+            else:
+                prob_m[i][j] = cooc_m[i][j]
 
+    print('Probabilities generated')
+    print (prob_m[1])
+    print (prob_m[5])
+    print (prob_m[2343])
+    print (prob_m[6438])
 
 def glove_init():
     try:
