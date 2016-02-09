@@ -14,6 +14,8 @@ TODO
 
 implement the option to download data direct from snli webpage + uncompress...
 http://nlp.stanford.edu/projects/snli/snli_1.0.zip
+
+CLEAN the code
 """
 
 
@@ -56,7 +58,6 @@ def test_init():
 def tokenize_sentence(sentence):
     regex = re.compile('[%s]' % re.escape(string.punctuation))
     sentence = regex.sub('', sentence).lower()
-    #print (sentence)
     tokenized_sentence = sentence.split(" ")
     return tokenized_sentence
 
@@ -105,9 +106,7 @@ def get_coocu_matrix(corpus, word2idx, nrows):
     easy to compute the probabilities...
     """
     for sentence in corpus:
-        #print (sentence)
         idx_sent = convert_sentence_index(sentence, word2idx)
-        #print (idx_sent)
         for idx_s in idx_sent:
             cooc_m[idx_s][0]=idx_s
             for idx_w in idx_sent:
@@ -118,7 +117,6 @@ def get_coocu_matrix(corpus, word2idx, nrows):
     first_row = True
     for row in cooc_m:
         if not first_row:
-            #print (occurences)
             row[nrows] = (np.sum(row))-row[0]
         first_row = False
     print('Counting done...')
@@ -137,10 +135,6 @@ def get_coocu_matrix(corpus, word2idx, nrows):
                 prob_m[i][j] = cooc_m[i][j]
 
     print('Probabilities generated')
-    print (prob_m[1])
-    print (prob_m[5])
-    print (prob_m[2343])
-    print (prob_m[6438])
 
 def glove_init():
     try:
