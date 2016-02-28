@@ -16,6 +16,9 @@ implement the option to download data direct from snli webpage + uncompress...
 http://nlp.stanford.edu/projects/snli/snli_1.0.zip
 
 CLEAN the code
+
+AS OF 25/02 the coocurrence matrix works properly but its useless the text that is given to be generated.
+
 """
 
 
@@ -49,7 +52,8 @@ default_folder = 'snli_1.0/'
 ndimensions = 300
 zero = 0.0
 #not_useful tokens
-non_useful_tokens = ['a', 'the']
+non_useful_tokens = ['a', 'the', 'in', 'the', 'and', 'on', 'with', 'of', 'to', 'an', 'at',
+                    'is', 'while']
 
 #functions
 def test_init():
@@ -89,10 +93,11 @@ def convert_sentence_index(sentence, word2id):
     sindex = []
     tokens_sentence = tokenize_sentence(sentence)
     for token in tokens_sentence:
-        sindex.append(word2id[token])
+        if token not in non_useful_tokens:
+            sindex.append(word2id[token])
     return sindex
 
-def get_coocu_matrix(corpus, word2idx, nrows):
+def get_coocu_matrix(corpus, word2idx, nrows, test=True):
     # not proper for computations...would be better a np matrix but to represent... word -> index?
     cooc_m = np.zeros((nrows+1, nrows+1))
     #prob_m = np.zeros((nrows+1, nrows+1))
@@ -121,7 +126,7 @@ def get_coocu_matrix(corpus, word2idx, nrows):
         first_row = False
     print('Counting done...')
     print('Generating probabilities...')
-    first_row = True
+
     #copyto(dst, src)
     prob_m = np.zeros((nrows+1, nrows+1))
 
@@ -133,6 +138,28 @@ def get_coocu_matrix(corpus, word2idx, nrows):
                 prob_m[i][j] = cooc_m[i][j]/cooc_m[i][nrows]
             else:
                 prob_m[i][j] = cooc_m[i][j]
+
+    if test:
+        value_test = word2idx['policeman']
+        
+        array_test = prob_m[value_test]
+        top_n_values = -15 # needs to be negative to pick the last sorted values from np.array
+        top_ten_ndarray = array_test.argsort()[top_n_values:][::-1]
+
+        for key, value in word2idx.items():
+            if value == value_test:
+                print ('looking coocurrences for: ', key, 'with id', value)
+
+        top_ten = top_ten_ndarray.tolist()
+
+        top_ten.remove(value_test)
+
+        for element in top_ten:
+            for key, value in word2idx.items():
+                if value == element:
+                    print (key,'(',value,') with probability:', prob_m[value_test][value])
+                    pass
+
 
     print('Probabilities generated')
 

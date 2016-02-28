@@ -13,7 +13,9 @@ from keras.layers.core import Activation, TimeDistributedDense, RepeatVector, Me
 from keras.regularizers import l2, activity_l2
 from keras.optimizers import SGD
 from keras.layers.embeddings import Embedding
+from keras.preprocessing.text import Tokenizer, one_hot, base_filter
 import numpy as np
+import glove
 
 class paper_model():
     #parameters
@@ -40,14 +42,20 @@ class paper_model():
     and outputs of the sentence embedding models (though not to its internal
     connections) with a fixed dropout rate. All models were implemented in a common framework for this paper.
     """
-    def build_model(self):
+    def build_model(self, max_features, data_train, word2idx):
             #DROPOUT TO INPUT AND OUTPUTS OF THE SENTENCE EMBEDDINGS!!
         print('Build embeddings model...')
+        #check this maxlen
+        maxlen = 50
+
         premise_model = Sequential()
         hypothesis_model = Sequential()
         # 2 embedding layers 1 per premise 1 per hypothesis
+        premise_model.add(Embedding(input_dim=self.vocab_size, output_dim=self.vocab_size, input_length=maxlen))
         premise_model.add(self.RNN(input_dim=self.vocab_size, output_dim=100, init='normal', activation='tanh'))
         premise_model.add(Dropout(0.2))
+
+        hypothesis_model.add(Embedding(input_dim=self.vocab_size, output_dim=self.vocab_size, input_length=maxlen))
         hypothesis_model.add(self.RNN(input_dim=self.vocab_size, output_dim=100, init='normal', activation='tanh'))
         hypothesis_model.add(Dropout(0.2))
 
@@ -68,13 +76,34 @@ class paper_model():
 
         print('Compiling model...')
         sgd = SGD(lr=0.1, decay=1e-6, momentum=0.9, nesterov=True)
-        nli_model.compile(loss='rmse', optimizer=sgd, class_mode='categorical')
+        nli_model.compile(loss='rmse', optimizer=sgd, class_mode='categorical'  )
         print('Model Compiled')
+        print('training model...')
+        premises = []
+        hypothesis = []
+        premises_encoded = []
+        hypothesis_encoded = []
+        expected_output = []
+        #split data
+        for data in data_train:
+            premises.append(data[0][0])
+            hypothesis.append(data[0][1])
+            premises_encoded.append(data[1][0])
+            hypothesis_encoded.append(data[1][1])
+            expected_output.append(data[2])
+
+
+        print(premises[0],premises_encoded[0], hypothesis[0], hypothesis_encoded[0], expected_output[0])
+        #train model
+        print('training....')
+
+        nli_model.fit([premises_encoded, hypothesis_encoded],expected_output, batch_size=128, nb_epoch=2, verbose=2)
 
     # model.fit()
+"""
+    def model_train(self, data_train):
 
-    def model_train(self):
-        model.fit(X_train, Y_train, batch_size=16, nb_epoch=10)
 
     def model_evaluate(self):
         score = model.evaluate(X_test, Y_test, batch_size=16)
+"""

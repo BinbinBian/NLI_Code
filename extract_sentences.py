@@ -10,7 +10,12 @@ This module extracts the sentences from the snli corpus:
 import sys
 import pandas as pd
 import numpy as np
+import re
+import string
 from keras.preprocessing.text import text_to_word_sequence, base_filter
+
+tokenizing_errors = 0
+
 
 def read_json_file():
 
@@ -72,18 +77,43 @@ def label_output_data(label):
                 }
     return labels[label]
 
-def create_sentence_ds(sentences_df):
+"""
+Generates a encoded vector, each cell 1 numbered refering to a word in the word2idx dictionary
+could use keras text to word, but gives some trouble with nonunicode tokens...have to convert to unicode all the time...see glove.py
+"""
+
+def create_vectorized_sentence(sentence, word2idx):
+
+    vectorized_sentence = []
+
+    regex = re.compile('[%s]' % re.escape(string.punctuation))
+    sentence = regex.sub('', sentence).lower()
+    tokenized_sentence = sentence.split(" ")
+
+    for token in tokenized_sentence:
+        if word2idx.get(token):
+            vectorized_sentence.append(word2idx[token])
+        else:
+            vectorized_sentence.append(-1.0) # dunno how to deal with mistakes, ask!
+
+    return np.asarray(vectorized_sentence)
+
+def create_sentence_ds(sentences_df, word2idx):
     # create pair [[s1,s2], label]
     data_set = []
     print('Generating dataset')
     list_premises = sentences_df['sentence1'].tolist()
     list_hypothesis = sentences_df['sentence2'].tolist()
     list_label = sentences_df['gold_label'].tolist()
+
     for premise, hypothesis, label_text in zip(list_premises, list_hypothesis, list_label):
             label_no_unicode = make_unicode(label_text)
             numpy_label = label_output_data(label_no_unicode)
-            print numpy_label
-            data_set.append([[premise, hypothesis],numpy_label])
+            premise_encoded = create_vectorized_sentence(premise, word2idx)
+            hypothesis_encoded = create_vectorized_sentence(hypothesis, word2idx)
+            #print numpy_label
+            #([pre-hypo],[encoded pre-hypo],[100]output) first pair of values is unnecesary right now 27/02, just for debug purpouses
+            data_set.append([[premise, hypothesis], [premise_encoded, hypothesis_encoded], numpy_label])
     return data_set
 
 def give_vocabulary(sentences_df):
@@ -107,15 +137,20 @@ def give_vocabulary(sentences_df):
     '''
     list_sentence_word_tmp = []
     for s1, s2 in zip (list_of_sentences1, list_of_sentences2):
-        sentence_no_unicode1 = make_unicode(s1)
-        sentence_no_unicode2 = make_unicode(s2)
+        sentence_unicode1 = make_unicode(s1)
+        sentence_unicode2 = make_unicode(s2)
         #print sentence_no_unicode
-        list_sentence_word_tmp += text_to_word_sequence(sentence_no_unicode1.encode('ascii'), filters=base_filter(), lower=True, split=" ")
-        list_sentence_word_tmp += text_to_word_sequence(sentence_no_unicode2.encode('ascii'), filters=base_filter(), lower=True, split=" ")
+        list_sentence_word_tmp += text_to_word_sequence(sentence_unicode1.encode('ascii'), filters=base_filter(), lower=True, split=" ")
+        list_sentence_word_tmp += text_to_word_sequence(sentence_unicode2.encode('ascii'), filters=base_filter(), lower=True, split=" ")
 
     set_words = set(list_sentence_word_tmp)
+    word2idx = {}
+    for i, word in enumerate(set_words):
+        word2idx[word] = i
+
+    #print word2idx
     print "length of vocabulary: %d"%len(set_words)
-    return set_words, len(set_words),
+    return set_words, len(set_words), word2idx
 
 # simple test of extracting a json file and showing the len of the vocabulary
 def test():
