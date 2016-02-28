@@ -46,7 +46,7 @@ class paper_model():
             #DROPOUT TO INPUT AND OUTPUTS OF THE SENTENCE EMBEDDINGS!!
         print('Build embeddings model...')
         #check this maxlen
-        maxlen = 50
+        maxlen = 25
 
         premise_model = Sequential()
         hypothesis_model = Sequential()
@@ -76,7 +76,7 @@ class paper_model():
 
         print('Compiling model...')
         sgd = SGD(lr=0.1, decay=1e-6, momentum=0.9, nesterov=True)
-        nli_model.compile(loss='rmse', optimizer=sgd, class_mode='categorical'  )
+        nli_model.compile(loss='mse', optimizer=sgd, class_mode='categorical'  )
         print('Model Compiled')
         print('training model...')
         premises = []
@@ -95,7 +95,20 @@ class paper_model():
 
         print(premises[0],premises_encoded[0], hypothesis[0], hypothesis_encoded[0], expected_output[0])
         #train model
+
+        print('writing shitty dataset log')
+        f = open('dataset.txt', 'w')
+        f.write('premises...\n')
+        f.write(str(premises_encoded))
+        f.write('hypothesis...\n')
+        f.write(str(hypothesis_encoded))
+        f.write('output...\n')
+        f.write(str(expected_output))
+
         print('training....')
+        #debug errors in dataset?????
+
+
 
         nli_model.fit([premises_encoded, hypothesis_encoded],expected_output, batch_size=128, nb_epoch=2, verbose=2)
 

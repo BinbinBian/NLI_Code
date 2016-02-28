@@ -13,6 +13,8 @@ import numpy as np
 import re
 import string
 from keras.preprocessing.text import text_to_word_sequence, base_filter
+from keras.preprocessing.sequence import pad_sequences
+
 
 tokenizing_errors = 0
 
@@ -94,11 +96,33 @@ def create_vectorized_sentence(sentence, word2idx):
         if word2idx.get(token):
             vectorized_sentence.append(word2idx[token])
         else:
-            vectorized_sentence.append(-1.0) # dunno how to deal with mistakes, ask!
+            vectorized_sentence.append(0) # dunno how to deal with mistakes, ask!
 
     return np.asarray(vectorized_sentence)
 
-def create_sentence_ds(sentences_df, word2idx):
+
+def pad_sentence(sentence, max_len=30, pad_with=0):
+        '''
+            @pads a single sentence
+            @if sentence is below max_len, returns a sentence(vectorized) of max_len with 0s on the right
+            @sentence is a list of tokens (right now, a numpy array)
+            @if sentence length larger than max_len, truncates the sentence to the max_len first values
+        '''
+        padded_sentence=np.zeros(max_len)
+
+        if len(sentence) < max_len:
+            #pads
+            for i,value in enumerate(sentence):
+                padded_sentence[i] = value
+        else:
+            #truncates
+            for i in range (len(padded_sentence)):
+                padded_sentence[i] = sentence[i]
+
+        return padded_sentence
+
+
+def create_sentence_ds(sentences_df, word2idx, maxlen=35):
     # create pair [[s1,s2], label]
     data_set = []
     print('Generating dataset')
@@ -111,9 +135,12 @@ def create_sentence_ds(sentences_df, word2idx):
             numpy_label = label_output_data(label_no_unicode)
             premise_encoded = create_vectorized_sentence(premise, word2idx)
             hypothesis_encoded = create_vectorized_sentence(hypothesis, word2idx)
+            padded_premise = pad_sentence(premise_encoded, max_len=maxlen)
+            padded_hypothesis = pad_sentence(hypothesis_encoded, max_len=maxlen)
             #print numpy_label
             #([pre-hypo],[encoded pre-hypo],[100]output) first pair of values is unnecesary right now 27/02, just for debug purpouses
-            data_set.append([[premise, hypothesis], [premise_encoded, hypothesis_encoded], numpy_label])
+            data_set.append([[premise, hypothesis], [padded_premise, padded_hypothesis], numpy_label])
+
     return data_set
 
 def give_vocabulary(sentences_df):
@@ -146,7 +173,7 @@ def give_vocabulary(sentences_df):
     set_words = set(list_sentence_word_tmp)
     word2idx = {}
     for i, word in enumerate(set_words):
-        word2idx[word] = i
+        word2idx[word] = int(i)
 
     #print word2idx
     print "length of vocabulary: %d"%len(set_words)
