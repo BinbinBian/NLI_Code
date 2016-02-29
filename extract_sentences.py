@@ -108,7 +108,7 @@ def pad_sentence(sentence, max_len=30, pad_with=0):
             @sentence is a list of tokens (right now, a numpy array)
             @if sentence length larger than max_len, truncates the sentence to the max_len first values
         '''
-        padded_sentence=np.zeros(max_len)
+        padded_sentence=np.zeros(max_len, dtype=int)
 
         if len(sentence) < max_len:
             #pads

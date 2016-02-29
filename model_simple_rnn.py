@@ -46,17 +46,17 @@ class paper_model():
             #DROPOUT TO INPUT AND OUTPUTS OF THE SENTENCE EMBEDDINGS!!
         print('Build embeddings model...')
         #check this maxlen
-        maxlen = 25
+        maxlen = 30
 
         premise_model = Sequential()
         hypothesis_model = Sequential()
         # 2 embedding layers 1 per premise 1 per hypothesis
-        premise_model.add(Embedding(input_dim=self.vocab_size, output_dim=self.vocab_size, input_length=maxlen))
-        premise_model.add(self.RNN(input_dim=self.vocab_size, output_dim=100, init='normal', activation='tanh'))
+        #premise_model.add(Embedding(input_dim=self.vocab_size, output_dim=self.vocab_size, input_length=maxlen))
+        premise_model.add(self.RNN(input_dim=self.vocab_size, output_dim=100, init='normal', activation='tanh', input_length=maxlen))
         premise_model.add(Dropout(0.2))
 
-        hypothesis_model.add(Embedding(input_dim=self.vocab_size, output_dim=self.vocab_size, input_length=maxlen))
-        hypothesis_model.add(self.RNN(input_dim=self.vocab_size, output_dim=100, init='normal', activation='tanh'))
+        #hypothesis_model.add(Embedding(input_dim=self.vocab_size, output_dim=self.vocab_size, input_length=maxlen))
+        hypothesis_model.add(self.RNN(input_dim=self.vocab_size, output_dim=100, init='normal', activation='tanh', input_length=maxlen))
         hypothesis_model.add(Dropout(0.2))
 
         print('Concat premise + hypothesis...')
@@ -93,11 +93,14 @@ class paper_model():
             expected_output.append(data[2])
 
 
-        print(premises[0],premises_encoded[0], hypothesis[0], hypothesis_encoded[0], expected_output[0])
+        print(premises_encoded[0], hypothesis_encoded[0], expected_output[0])
         #train model
 
-        print('writing shitty dataset log')
+        #print('writing shitty dataset log')
+        print(len(premises_encoded), len(hypothesis_encoded), len(expected_output))
+        """
         f = open('dataset.txt', 'w')
+
         f.write('premises...\n')
         f.write(str(premises_encoded))
         f.write('hypothesis...\n')
@@ -105,12 +108,31 @@ class paper_model():
         f.write('output...\n')
         f.write(str(expected_output))
 
+        f.write('dictionary...\n')
+        f.write(str(word2idx))
+        """
         print('training....')
         #debug errors in dataset?????
 
 
+        premises_encoded = np.asarray([premises_encoded])
+        hypothesis_encoded = np.asarray([hypothesis_encoded])
+        expected_output = np.asarray(expected_output)
 
-        nli_model.fit([premises_encoded, hypothesis_encoded],expected_output, batch_size=128, nb_epoch=2, verbose=2)
+
+        X = [premises_encoded, hypothesis_encoded]
+        y = expected_output
+
+
+        if len(set([len(a) for a in X] + [len(y)])) != 1:
+            for a in X:
+                print len(a)
+            print('im retard, ', len(set([len(a) for a in X] + [len(y)])))
+
+
+
+        # I dont want the conversion here, make the conversion somewhere else, for esthetic purpouses
+        nli_model.fit([premises_encoded, hypothesis_encoded], expected_output, batch_size=128, nb_epoch=2, verbose=2)
 
     # model.fit()
 """
