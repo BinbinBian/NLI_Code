@@ -9,13 +9,14 @@ http://nlp.stanford.edu/pubs/snli_paper.pdf
 
 from keras.layers import recurrent
 from keras.models import Sequential, slice_X
-from keras.layers.core import Activation, TimeDistributedDense, RepeatVector, Merge, Dense, Dropout
+from keras.layers.core import Activation, TimeDistributedDense, RepeatVector, Merge, Dense, Dropout, Flatten
 from keras.regularizers import l2, activity_l2
 from keras.optimizers import SGD
 from keras.layers.embeddings import Embedding
 from keras.preprocessing.text import Tokenizer, one_hot, base_filter
 import numpy as np
 import glove
+from extract_sentences import return_sparse_vector
 
 class paper_model():
     #parameters
@@ -42,30 +43,33 @@ class paper_model():
     and outputs of the sentence embedding models (though not to its internal
     connections) with a fixed dropout rate. All models were implemented in a common framework for this paper.
     """
+
+
+
     def build_model(self, max_features, data_train, word2idx):
             #DROPOUT TO INPUT AND OUTPUTS OF THE SENTENCE EMBEDDINGS!!
         print('Build embeddings model...')
         #check this maxlen
-        maxlen = 30
+        maxlen = 35
 
         premise_model = Sequential()
         hypothesis_model = Sequential()
         # 2 embedding layers 1 per premise 1 per hypothesis
-        #premise_model.add(Embedding(input_dim=self.vocab_size, output_dim=self.vocab_size, input_length=maxlen))
-        premise_model.add(self.RNN(input_dim=self.vocab_size, output_dim=100, init='normal', activation='tanh', input_length=maxlen))
+        #premise_model.add(Flatten(i))
+        premise_model.add(self.RNN(100, init='normal', activation='tanh', input_shape=(maxlen,self.vocab_size)))
         premise_model.add(Dropout(0.2))
 
         #hypothesis_model.add(Embedding(input_dim=self.vocab_size, output_dim=self.vocab_size, input_length=maxlen))
-        hypothesis_model.add(self.RNN(input_dim=self.vocab_size, output_dim=100, init='normal', activation='tanh', input_length=maxlen))
+        hypothesis_model.add(self.RNN(100, init='normal', activation='tanh', input_shape=(maxlen,self.vocab_size)))
         hypothesis_model.add(Dropout(0.2))
 
         print('Concat premise + hypothesis...')
         nli_model = Sequential()
-        nli_model.add(Merge([premise_model, hypothesis_model], mode='concat', concat_axis=-1))
+        nli_model.add(Merge([premise_model, hypothesis_model], mode='concat', concat_axis=1))
 
         for i in range(1, self.stacked_layers):
             print ('stacking %d layer')%i
-            nli_model.add(Dense(input_dim=200, output_dim=200, init='normal', activation='tanh'))
+            nli_model.add(Dense(input_dim=100, output_dim=200, init='normal', activation='tanh'))
 
         print ('stacking last recurrent layer')
         nli_model.add(Dense(input_dim=200, output_dim=3, init='normal', activation='tanh'))
@@ -78,26 +82,27 @@ class paper_model():
         sgd = SGD(lr=0.1, decay=1e-6, momentum=0.9, nesterov=True)
         nli_model.compile(loss='mse', optimizer=sgd, class_mode='categorical'  )
         print('Model Compiled')
-        print('training model...')
+        print('generating sparse vectors(1hot encoding) from sentences...')
         premises = []
         hypothesis = []
         premises_encoded = []
         hypothesis_encoded = []
         expected_output = []
         #split data
+
         for data in data_train:
             premises.append(data[0][0])
             hypothesis.append(data[0][1])
-            premises_encoded.append(data[1][0])
-            hypothesis_encoded.append(data[1][1])
+            premises_encoded.append( return_sparse_vector(data[1][0], self.vocab_size ))
+            hypothesis_encoded.append( return_sparse_vector(data[1][1], self.vocab_size ))
             expected_output.append(data[2])
 
 
-        print(premises_encoded[0], hypothesis_encoded[0], expected_output[0])
+        #print(premises_encoded[0], hypothesis_encoded[0], expected_output[0])
         #train model
 
         #print('writing shitty dataset log')
-        print(len(premises_encoded), len(hypothesis_encoded), len(expected_output))
+        #print(len(premises_encoded), len(hypothesis_encoded), len(expected_output))
         """
         f = open('dataset.txt', 'w')
 
@@ -111,28 +116,45 @@ class paper_model():
         f.write('dictionary...\n')
         f.write(str(word2idx))
         """
-        print('training....')
+        #print('training....')
         #debug errors in dataset?????
 
+        """
+        nb_samples, timesteps, input_dim) means:
+        - nb_samples samples (examples)
+        - for each sample, a number of time steps (the same for all samples in the batch)
+        - for each time step of each sample, input_dim features.
+        NEEEEED TO CONVER DATA TO SPARSE VECTORSSASDASD
+        """
 
-        premises_encoded = np.asarray([premises_encoded])
-        hypothesis_encoded = np.asarray([hypothesis_encoded])
+        '''
+        TODO PREPARE DATA OUTSIDE HERE TO GENERATE BOTH TEST AND TRAIN
+        '''
+
+        print('premsises shape and sample....')
+        premises_encoded = np.asarray(premises_encoded)
+        print premises_encoded.shape
+        #print premises_encoded[0]
+        #premises_encoded = np.reshape()
+        print('hypothesis shape and sample....')
+        hypothesis_encoded = np.asarray(hypothesis_encoded)
+        print hypothesis_encoded.shape
+        #print hypothesis_encoded[0]
+        #hypothesis_encoded = hypothesis_encoded.reshape(hypothesis_encoded.shape[0], hypothesis_encoded.shape[1])
         expected_output = np.asarray(expected_output)
-
+        #expected_output = expected_output.reshape(expected_output.shape[0], expected_output.shape[1])
+        print('output shape and sample....')
+        print expected_output.shape
+        print expected_output[0]
+        #expected_output = expected_output.reshape(1, expected_output.shape[0], expected_output.shape[1])
+        #error is here
+        #(nb_samples, timesteps, input_dim). -> (expected_output[0], [1], len_vocab)
 
         X = [premises_encoded, hypothesis_encoded]
-        y = expected_output
 
-
-        if len(set([len(a) for a in X] + [len(y)])) != 1:
-            for a in X:
-                print len(a)
-            print('im retard, ', len(set([len(a) for a in X] + [len(y)])))
-
-
-
+        print('training....')
         # I dont want the conversion here, make the conversion somewhere else, for esthetic purpouses
-        nli_model.fit([premises_encoded, hypothesis_encoded], expected_output, batch_size=128, nb_epoch=2, verbose=2)
+        nli_model.fit(X, expected_output, batch_size=256, nb_epoch=500, verbose=2, sample_weight=None)
 
     # model.fit()
 """

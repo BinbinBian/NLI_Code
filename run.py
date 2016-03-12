@@ -5,9 +5,11 @@ from extract_sentences import give_vocabulary, read_json_file, create_sentence_d
 from model_simple_rnn import paper_model
 from shuffle_data import get_test_train_sets
 
+import numpy as np
+
 
 #split parameters for dev set
-percentage_split_ds = 0.85
+percentage_split_ds = 0.2
 
 df_data = read_json_file()
 

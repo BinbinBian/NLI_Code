@@ -19,6 +19,22 @@ from keras.preprocessing.sequence import pad_sequences
 tokenizing_errors = 0
 
 
+
+def return_sparse_vector(sentence, vocab_size):
+    """
+        @params:
+        sentence: array with the encoded sentence [1 534 232 ... 3 ...0]
+        returns len(sentence) np.arrays with 1 hot encoded vectors
+    """
+    sparse_vector = []
+    for item in sentence:
+        one_hot_vector = np.zeros(vocab_size)
+        one_hot_vector[item] = 1
+        sparse_vector.append(one_hot_vector)
+
+    return np.asarray(sparse_vector)
+
+
 def read_json_file():
 
     file_to_read = 'snli_1.0/snli_1.0_dev.jsonl'
