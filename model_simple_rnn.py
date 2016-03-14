@@ -14,6 +14,7 @@ from keras.regularizers import l2, activity_l2
 from keras.optimizers import SGD
 from keras.layers.embeddings import Embedding
 from keras.preprocessing.text import Tokenizer, one_hot, base_filter
+
 import numpy as np
 import glove
 from extract_sentences import return_sparse_vector
@@ -24,6 +25,7 @@ class paper_model():
         self.RNN = recurrent.SimpleRNN
         self.stacked_layers = number_stacked_layers
         self.vocab_size = vocabulary_size
+        self.weights_path = "./weights.hdf5"
 
     #NN paramters!
     """
@@ -44,9 +46,18 @@ class paper_model():
     connections) with a fixed dropout rate. All models were implemented in a common framework for this paper.
     """
 
+    def data_preparation_nn(self, sentences):
+        premises_encoded = []
+        hypothesis_encoded = []
+        expected_output = []
+        for data in sentences:
+            premises_encoded.append( return_sparse_vector(data[1][0], self.vocab_size ))
+            hypothesis_encoded.append( return_sparse_vector(data[1][1], self.vocab_size ))
+            expected_output.append(data[2])
 
+        return np.asarray(premises_encoded), np.asarray(hypothesis_encoded), np.asarray(expected_output)
 
-    def build_model(self, max_features, data_train, word2idx):
+    def build_model(self, max_features, data_train, data_test, word2idx, LOAD_W=True):
             #DROPOUT TO INPUT AND OUTPUTS OF THE SENTENCE EMBEDDINGS!!
         print('Build embeddings model...')
         #check this maxlen
@@ -57,11 +68,11 @@ class paper_model():
         # 2 embedding layers 1 per premise 1 per hypothesis
         #premise_model.add(Flatten(i))
         premise_model.add(self.RNN(100, init='normal', activation='tanh', input_shape=(maxlen,self.vocab_size)))
-        premise_model.add(Dropout(0.2))
+        #premise_model.add(Dropout(0.1))
 
         #hypothesis_model.add(Embedding(input_dim=self.vocab_size, output_dim=self.vocab_size, input_length=maxlen))
         hypothesis_model.add(self.RNN(100, init='normal', activation='tanh', input_shape=(maxlen,self.vocab_size)))
-        hypothesis_model.add(Dropout(0.2))
+        #hypothesis_model.add(Dropout(0.1))
 
         print('Concat premise + hypothesis...')
         nli_model = Sequential()
@@ -71,7 +82,7 @@ class paper_model():
             print ('stacking %d layer')%i
             nli_model.add(Dense(input_dim=100, output_dim=200, init='normal', activation='tanh'))
 
-        print ('stacking last recurrent layer')
+        print ('stacking last layer')
         nli_model.add(Dense(input_dim=200, output_dim=3, init='normal', activation='tanh'))
         print ('Softmax layer...')
         # 3 way softmax (entail, neutral, contradiction)
@@ -79,45 +90,15 @@ class paper_model():
         nli_model.add(Activation('softmax')) # care! 3way softmax!
 
         print('Compiling model...')
-        sgd = SGD(lr=0.1, decay=1e-6, momentum=0.9, nesterov=True)
-        nli_model.compile(loss='mse', optimizer=sgd, class_mode='categorical'  )
+        #sgd = SGD(lr=0.1, decay=1e-6, momentum=0.9, nesterov=True)
+        nli_model.compile(loss='categorical_crossentropy', optimizer='rmsprop')
         print('Model Compiled')
         print('generating sparse vectors(1hot encoding) from sentences...')
-        premises = []
-        hypothesis = []
-        premises_encoded = []
-        hypothesis_encoded = []
-        expected_output = []
+
+
         #split data
-
-        for data in data_train:
-            premises.append(data[0][0])
-            hypothesis.append(data[0][1])
-            premises_encoded.append( return_sparse_vector(data[1][0], self.vocab_size ))
-            hypothesis_encoded.append( return_sparse_vector(data[1][1], self.vocab_size ))
-            expected_output.append(data[2])
-
-
-        #print(premises_encoded[0], hypothesis_encoded[0], expected_output[0])
-        #train model
-
-        #print('writing shitty dataset log')
-        #print(len(premises_encoded), len(hypothesis_encoded), len(expected_output))
-        """
-        f = open('dataset.txt', 'w')
-
-        f.write('premises...\n')
-        f.write(str(premises_encoded))
-        f.write('hypothesis...\n')
-        f.write(str(hypothesis_encoded))
-        f.write('output...\n')
-        f.write(str(expected_output))
-
-        f.write('dictionary...\n')
-        f.write(str(word2idx))
-        """
-        #print('training....')
-        #debug errors in dataset?????
+        #data preparation
+        premises_encoded, hypothesis_encoded, expected_output = self.data_preparation_nn(data_train)
 
         """
         nb_samples, timesteps, input_dim) means:
@@ -132,29 +113,45 @@ class paper_model():
         '''
 
         print('premsises shape and sample....')
-        premises_encoded = np.asarray(premises_encoded)
         print premises_encoded.shape
-        #print premises_encoded[0]
-        #premises_encoded = np.reshape()
         print('hypothesis shape and sample....')
-        hypothesis_encoded = np.asarray(hypothesis_encoded)
         print hypothesis_encoded.shape
-        #print hypothesis_encoded[0]
-        #hypothesis_encoded = hypothesis_encoded.reshape(hypothesis_encoded.shape[0], hypothesis_encoded.shape[1])
-        expected_output = np.asarray(expected_output)
-        #expected_output = expected_output.reshape(expected_output.shape[0], expected_output.shape[1])
         print('output shape and sample....')
         print expected_output.shape
         print expected_output[0]
-        #expected_output = expected_output.reshape(1, expected_output.shape[0], expected_output.shape[1])
-        #error is here
+
         #(nb_samples, timesteps, input_dim). -> (expected_output[0], [1], len_vocab)
 
         X = [premises_encoded, hypothesis_encoded]
 
-        print('training....')
+
+        if LOAD_W:
+            print('loading weights...')
+            nli_model.load_weights(self.weights_path)
         # I dont want the conversion here, make the conversion somewhere else, for esthetic purpouses
-        nli_model.fit(X, expected_output, batch_size=256, nb_epoch=500, verbose=2, sample_weight=None)
+        print('training....')
+        nli_model.fit(X, expected_output, batch_size=64, nb_epoch=10, verbose=1, sample_weight=None, show_accuracy=True)
+
+        print ('testing....')
+        premises_encoded_t, hypothesis_encoded_t, expected_output_t = self.data_preparation_nn(data_test)
+        print('saving weights')
+        nli_model.save_weights(self.weights_path, overwrite=True)
+        X_t = [premises_encoded_t, hypothesis_encoded_t]
+        score = nli_model.evaluate(X_t, expected_output_t, batch_size=64, show_accuracy=True, verbose=1)
+        predictions = nli_model.predict_classes(X_t, batch_size=64, verbose=1)
+
+        """
+        store results?
+        """
+
+        f = open('predictions.txt', 'w')
+        for pred, e_out in zip(predictions, expected_output_t):
+            sup = str(pred) + str(e_out)
+            f.write(sup)
+            f.write('\n')
+        f.close()
+
+
 
     # model.fit()
 """

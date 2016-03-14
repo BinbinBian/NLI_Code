@@ -14,7 +14,7 @@ import re
 import string
 from keras.preprocessing.text import text_to_word_sequence, base_filter
 from keras.preprocessing.sequence import pad_sequences
-
+from random import seed, uniform
 
 tokenizing_errors = 0
 
@@ -138,8 +138,10 @@ def pad_sentence(sentence, max_len=30, pad_with=0):
         return padded_sentence
 
 
-def create_sentence_ds(sentences_df, word2idx, maxlen=35):
+def create_sentence_ds(sentences_df, word2idx, shitty_pc, cut_ds,  maxlen=35,):
     # create pair [[s1,s2], label]
+    seed = 1337 #great seed
+
     data_set = []
     print('Generating dataset')
     list_premises = sentences_df['sentence1'].tolist()
@@ -147,15 +149,17 @@ def create_sentence_ds(sentences_df, word2idx, maxlen=35):
     list_label = sentences_df['gold_label'].tolist()
 
     for premise, hypothesis, label_text in zip(list_premises, list_hypothesis, list_label):
-            label_no_unicode = make_unicode(label_text)
-            numpy_label = label_output_data(label_no_unicode)
-            premise_encoded = create_vectorized_sentence(premise, word2idx)
-            hypothesis_encoded = create_vectorized_sentence(hypothesis, word2idx)
-            padded_premise = pad_sentence(premise_encoded, max_len=maxlen)
-            padded_hypothesis = pad_sentence(hypothesis_encoded, max_len=maxlen)
-            #print numpy_label
-            #([pre-hypo],[encoded pre-hypo],[100]output) first pair of values is unnecesary right now 27/02, just for debug purpouses
-            data_set.append([[premise, hypothesis], [padded_premise, padded_hypothesis], numpy_label])
+            num = uniform(1.0, 0.0)
+            if num < cut_ds:
+                label_no_unicode = make_unicode(label_text)
+                numpy_label = label_output_data(label_no_unicode)
+                premise_encoded = create_vectorized_sentence(premise, word2idx)
+                hypothesis_encoded = create_vectorized_sentence(hypothesis, word2idx)
+                padded_premise = pad_sentence(premise_encoded, max_len=maxlen)
+                padded_hypothesis = pad_sentence(hypothesis_encoded, max_len=maxlen)
+                #print numpy_label
+                #([pre-hypo],[encoded pre-hypo],[100]output) first pair of values is unnecesary right now 27/02, just for debug purpouses
+                data_set.append([[premise, hypothesis], [padded_premise, padded_hypothesis], numpy_label])
 
     return data_set
 
