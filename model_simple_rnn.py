@@ -21,7 +21,7 @@ from extract_sentences import return_sparse_vector
 
 class paper_model():
     #parameters
-    def __init__(self, number_stacked_layers, vocabulary_size):
+    def __init__(self, number_stacked_layers, vocabulary_size=300):
         self.RNN = recurrent.SimpleRNN
         self.stacked_layers = number_stacked_layers
         self.vocab_size = vocabulary_size
@@ -51,28 +51,29 @@ class paper_model():
         hypothesis_encoded = []
         expected_output = []
         for data in sentences:
-            premises_encoded.append( return_sparse_vector(data[1][0], self.vocab_size ))
-            hypothesis_encoded.append( return_sparse_vector(data[1][1], self.vocab_size ))
-            expected_output.append(data[2])
-
+            #print data[0][0].shape, data[0][1].shape
+            premises_encoded.append(data[0][0])
+            hypothesis_encoded.append(data[0][1])
+            expected_output.append(data[1])
         return np.asarray(premises_encoded), np.asarray(hypothesis_encoded), np.asarray(expected_output)
 
-    def build_model(self, max_features, data_train, data_test, word2idx, LOAD_W=True):
+
+    def build_model(self, data_train, data_test, LOAD_W=True):
             #DROPOUT TO INPUT AND OUTPUTS OF THE SENTENCE EMBEDDINGS!!
         print('Build embeddings model...')
         #check this maxlen
-        maxlen = 35
+        maxlen = 50
 
         premise_model = Sequential()
         hypothesis_model = Sequential()
         # 2 embedding layers 1 per premise 1 per hypothesis
-        #premise_model.add(Flatten(i))
+        #hypothesis_model.add(Embedding(input_dim=self.vocab_size, output_dim=self.vocab_size, input_length=maxlen))
         premise_model.add(self.RNN(100, init='normal', activation='tanh', input_shape=(maxlen,self.vocab_size)))
-        #premise_model.add(Dropout(0.1))
+
 
         #hypothesis_model.add(Embedding(input_dim=self.vocab_size, output_dim=self.vocab_size, input_length=maxlen))
         hypothesis_model.add(self.RNN(100, init='normal', activation='tanh', input_shape=(maxlen,self.vocab_size)))
-        #hypothesis_model.add(Dropout(0.1))
+
 
         print('Concat premise + hypothesis...')
         nli_model = Sequential()
@@ -93,7 +94,7 @@ class paper_model():
         #sgd = SGD(lr=0.1, decay=1e-6, momentum=0.9, nesterov=True)
         nli_model.compile(loss='categorical_crossentropy', optimizer='rmsprop')
         print('Model Compiled')
-        print('generating sparse vectors(1hot encoding) from sentences...')
+        #print('generating sparse vectors(1hot encoding) from sentences...')
 
 
         #split data
@@ -130,15 +131,15 @@ class paper_model():
             nli_model.load_weights(self.weights_path)
         # I dont want the conversion here, make the conversion somewhere else, for esthetic purpouses
         print('training....')
-        nli_model.fit(X, expected_output, batch_size=64, nb_epoch=10, verbose=1, sample_weight=None, show_accuracy=True)
+        nli_model.fit(X, expected_output, batch_size=96, nb_epoch=1000, verbose=1, sample_weight=None, show_accuracy=True)
 
         print ('testing....')
         premises_encoded_t, hypothesis_encoded_t, expected_output_t = self.data_preparation_nn(data_test)
         print('saving weights')
         nli_model.save_weights(self.weights_path, overwrite=True)
         X_t = [premises_encoded_t, hypothesis_encoded_t]
-        score = nli_model.evaluate(X_t, expected_output_t, batch_size=64, show_accuracy=True, verbose=1)
-        predictions = nli_model.predict_classes(X_t, batch_size=64, verbose=1)
+        score = nli_model.evaluate(X_t, expected_output_t, batch_size=96, show_accuracy=True, verbose=1)
+        predictions = nli_model.predict(X_t, batch_size=96, verbose=1)
 
         """
         store results?

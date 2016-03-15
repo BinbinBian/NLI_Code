@@ -18,6 +18,37 @@ from random import seed, uniform
 
 tokenizing_errors = 0
 
+def build_glove_dictionary():
+    """
+        builds a dictionary based on the glove model.
+        http://nlp.stanford.edu/projects/glove/
+        dictionary will have the form of key = token, value = numpy array with the pretrained values
+
+        REALLY IMPORTANT the glove dataset. with the big one finds nearly everything....
+        smallest one...quite baaaaaad...
+    """
+    print ('building glove dictionary...')
+    glove_file = '../TBIR/glove.840B.300d.txt'
+    glove_dict = {}
+    with open(glove_file) as fd_glove:
+        for i, input in enumerate(fd_glove):
+            if i%5000 == 0:
+                print i, 'entries on the dictionary'
+            input_split = input.split(" ")
+            #print input_split
+            key = input_split[0] #get key
+            del input_split[0]  # remove key
+            values = []
+            for value in input_split:
+                values.append(float(value))
+            np_values = np.asarray(values)
+            glove_dict[key] = np_values
+
+    print 'dictionary build with length', len(glove_dict)
+
+    return glove_dict
+
+
 
 
 def return_sparse_vector(sentence, vocab_size):
@@ -117,7 +148,7 @@ def create_vectorized_sentence(sentence, word2idx):
     return np.asarray(vectorized_sentence)
 
 
-def pad_sentence(sentence, max_len=30, pad_with=0):
+def pad_sentence(sentence, max_len=35, pad_with=0):
         '''
             @pads a single sentence
             @if sentence is below max_len, returns a sentence(vectorized) of max_len with 0s on the right
@@ -138,7 +169,7 @@ def pad_sentence(sentence, max_len=30, pad_with=0):
         return padded_sentence
 
 
-def create_sentence_ds(sentences_df, word2idx, shitty_pc, cut_ds,  maxlen=35,):
+def create_sentence_ds(sentences_df, word2idx, cut_ds,  maxlen=35,):
     # create pair [[s1,s2], label]
     seed = 1337 #great seed
 
