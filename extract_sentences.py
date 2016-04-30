@@ -15,6 +15,7 @@ import string
 from keras.preprocessing.text import text_to_word_sequence, base_filter
 from keras.preprocessing.sequence import pad_sequences
 from random import seed, uniform
+from sys import stdout
 
 tokenizing_errors = 0
 
@@ -32,8 +33,8 @@ def build_glove_dictionary():
     glove_dict = {}
     with open(glove_file) as fd_glove:
         for i, input in enumerate(fd_glove):
-            if i%5000 == 0:
-                print i, 'entries on the dictionary'
+            stdout.write("\rloading glove dictionary: %d" % i)
+            stdout.flush()
             input_split = input.split(" ")
             #print input_split
             key = input_split[0] #get key
@@ -44,8 +45,8 @@ def build_glove_dictionary():
             np_values = np.asarray(values)
             glove_dict[key] = np_values
 
-    print 'dictionary build with length', len(glove_dict)
-
+    #print 'dictionary build with length', len(glove_dict)
+    print ""
     return glove_dict
 
 
@@ -68,7 +69,7 @@ def return_sparse_vector(sentence, vocab_size):
 
 def read_json_file():
 
-    file_to_read = 'snli_1.0/snli_1.0_dev.jsonl'
+    file_to_read = 'snli_1.0/snli_1.0_train.jsonl'
 
     try:
         #read whole file into python array
@@ -102,9 +103,22 @@ def read_json_file():
         del data_df['sentence1_parse']
         del data_df['sentence2_binary_parse']
         del data_df['sentence2_parse']
-        print data_df.head(3)
-        print data_df.tail(3)
 
+        list_of_sentences1 = data_df['annotator_labels'].tolist()
+        counter_1 = 0
+        counter_2 = 0
+        counter_3 = 0
+
+        for dp in list_of_sentences1:
+            if len(set(dp)) is 1:
+                counter_1 +=1
+            if len(set(dp)) is 2:
+                counter_2 +=1
+            if len(set(dp)) is 3:
+                counter_3 +=1
+
+        print counter_1, counter_2, counter_3
+        #raise SystemExit(0)
         return data_df
     except IOError as e:
         print e

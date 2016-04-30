@@ -21,12 +21,18 @@ from extract_sentences import return_sparse_vector
 
 class paper_model():
     #parameters
-    def __init__(self, number_stacked_layers, vocabulary_size=300):
-        self.RNN = recurrent.SimpleRNN
+    def __init__(self, number_stacked_layers=3, vocabulary_size=300, is_tbir=False):
+        self.RNN = recurrent.LSTM
         self.stacked_layers = number_stacked_layers
-        self.vocab_size = vocabulary_size
+        self.vocab_size = vocabulary_size #dimensions of embeddings
         self.weights_path = "./weights.hdf5"
-
+        self.nli_model = ''
+        if is_tbir:
+            self.filename_output = 'predictions_tbir.txt'
+            open(self.filename_output, 'w')
+        else:
+            self.filename_output = 'predictions.txt'
+            open(self.filename_output, 'w')
     #NN paramters!
     """
     simply a stack of three 200d
@@ -46,23 +52,38 @@ class paper_model():
     connections) with a fixed dropout rate. All models were implemented in a common framework for this paper.
     """
 
-    def data_preparation_nn(self, sentences):
+    def data_preparation_nn(self, sentences, diferences=3):
         premises_encoded = []
         hypothesis_encoded = []
         expected_output = []
         for data in sentences:
             #print data[0][0].shape, data[0][1].shape
+            if data[2] <= diferences:
+                premises_encoded.append(data[0][0])
+                hypothesis_encoded.append(data[0][1])
+                expected_output.append(data[1])
+        return np.asarray(premises_encoded), np.asarray(hypothesis_encoded), np.asarray(expected_output)
+
+    def data_tbir_preparation(self, sentences):
+        premises_encoded = []
+        hypothesis_encoded = []
+        expected_output = []
+        id_query=[]
+        id_premises=[]
+        for data in sentences:
             premises_encoded.append(data[0][0])
             hypothesis_encoded.append(data[0][1])
             expected_output.append(data[1])
-        return np.asarray(premises_encoded), np.asarray(hypothesis_encoded), np.asarray(expected_output)
+            id_query.append(data[2])
+            id_premises.append(data[3])
+        return np.asarray(premises_encoded), np.asarray(hypothesis_encoded), expected_output, id_query, id_premises
 
 
-    def build_model(self, data_train, data_test, LOAD_W=True):
+    def build_model(self, LOAD_W=True):
             #DROPOUT TO INPUT AND OUTPUTS OF THE SENTENCE EMBEDDINGS!!
         print('Build embeddings model...')
         #check this maxlen
-        maxlen = 50
+        maxlen = 45
 
         premise_model = Sequential()
         hypothesis_model = Sequential()
@@ -76,30 +97,35 @@ class paper_model():
 
 
         print('Concat premise + hypothesis...')
-        nli_model = Sequential()
-        nli_model.add(Merge([premise_model, hypothesis_model], mode='concat', concat_axis=1))
+        self.nli_model = Sequential()
+        self.nli_model.add(Merge([premise_model, hypothesis_model], mode='concat', concat_axis=1))
 
         for i in range(1, self.stacked_layers):
             print ('stacking %d layer')%i
-            nli_model.add(Dense(input_dim=100, output_dim=200, init='normal', activation='tanh'))
+            self.nli_model.add(Dense(input_dim=100, output_dim=200, init='normal', activation='tanh'))
 
         print ('stacking last layer')
-        nli_model.add(Dense(input_dim=200, output_dim=3, init='normal', activation='tanh'))
+        self.nli_model.add(Dense(input_dim=200, output_dim=3, init='normal', activation='tanh'))
         print ('Softmax layer...')
         # 3 way softmax (entail, neutral, contradiction)
-        nli_model.add(Dense(3, init='uniform'))
-        nli_model.add(Activation('softmax')) # care! 3way softmax!
+        self.nli_model.add(Dense(3, init='uniform'))
+        self.nli_model.add(Activation('softmax')) # care! 3way softmax!
 
         print('Compiling model...')
         #sgd = SGD(lr=0.1, decay=1e-6, momentum=0.9, nesterov=True)
-        nli_model.compile(loss='categorical_crossentropy', optimizer='rmsprop')
+        self.nli_model.compile(loss='categorical_crossentropy', optimizer='rmsprop')
         print('Model Compiled')
         #print('generating sparse vectors(1hot encoding) from sentences...')
+        if LOAD_W:
+            print('loading weights...')
+            self.nli_model.load_weights(self.weights_path)
 
+    def train_model(self, data_train):
 
         #split data
         #data preparation
-        premises_encoded, hypothesis_encoded, expected_output = self.data_preparation_nn(data_train)
+        #print data_train[0]
+        premises_encoded, hypothesis_encoded, expected_output = self.data_preparation_nn(data_train, 3)
 
         """
         nb_samples, timesteps, input_dim) means:
@@ -124,41 +150,45 @@ class paper_model():
         #(nb_samples, timesteps, input_dim). -> (expected_output[0], [1], len_vocab)
 
         X = [premises_encoded, hypothesis_encoded]
-
-
-        if LOAD_W:
-            print('loading weights...')
-            nli_model.load_weights(self.weights_path)
+        #print X[0]
+        raise SystemExit(0)
         # I dont want the conversion here, make the conversion somewhere else, for esthetic purpouses
         print('training....')
-        nli_model.fit(X, expected_output, batch_size=96, nb_epoch=1000, verbose=1, sample_weight=None, show_accuracy=True)
+        self.nli_model.fit(X, expected_output, batch_size=64, nb_epoch=1, verbose=1, sample_weight=None, show_accuracy=True)
+        print('saving weights')
+        self.nli_model.save_weights(self.weights_path, overwrite=True)
+
+    def test_model(self, data_test, is_tbir=False):
 
         print ('testing....')
-        premises_encoded_t, hypothesis_encoded_t, expected_output_t = self.data_preparation_nn(data_test)
-        print('saving weights')
-        nli_model.save_weights(self.weights_path, overwrite=True)
+        if is_tbir is False:
+            premises_encoded_t, hypothesis_encoded_t, expected_output_t = self.data_preparation_nn(data_test, 3)
+        else:
+            #print data_test[0]
+            premises_encoded_t, hypothesis_encoded_t, expected_output_t, img_query_t, id_querys = self.data_tbir_preparation(data_test)
+
+        print('premsises shape and sample....')
+        print premises_encoded_t.shape
+        print('hypothesis shape and sample....')
+        print hypothesis_encoded_t.shape
+
         X_t = [premises_encoded_t, hypothesis_encoded_t]
-        score = nli_model.evaluate(X_t, expected_output_t, batch_size=96, show_accuracy=True, verbose=1)
-        predictions = nli_model.predict(X_t, batch_size=96, verbose=1)
+        #print X_t[0]
+        #score = self.nli_model.evaluate(X_t, expected_output_t, batch_size=128, show_accuracy=True, verbose=1)
+        predictions = self.nli_model.predict(X_t, batch_size=128, verbose=1)
 
         """
         store results?
         """
-
-        f = open('predictions.txt', 'w')
-        for pred, e_out in zip(predictions, expected_output_t):
-            sup = str(pred) + str(e_out)
+        correct = 0
+        f = open(self.filename_output, 'a')
+        for pred, e_out, id_query, idq in zip(predictions, expected_output_t, img_query_t, id_querys):
+            #print np.argmax(pred), np.argmax(e_out)
+            if np.argmax(pred) == np.argmax(e_out): #np arrays!
+                correct +=1
+            sup = str(pred) + " " + str(e_out) + " " + str(id_query) + " " + str(idq)
             f.write(sup)
             f.write('\n')
         f.close()
 
-
-
-    # model.fit()
-"""
-    def model_train(self, data_train):
-
-
-    def model_evaluate(self):
-        score = model.evaluate(X_test, Y_test, batch_size=16)
-"""
+        print 'Predictions correct ', correct,'out of',len(predictions), 'acc(%): ',float(correct)/float(len(predictions))
